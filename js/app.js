@@ -5,11 +5,11 @@
     const UNITS = ["row", "column", "block"];
 
     const DEMO_GAMES = {
-        VeryEasy: "",
-        Easy: "",
-        EasyMedium: "",
-        Medium: "",
-        MediumHard: "",
+        VeryEasy: "607500100140600903980710605503000090060050010791268530074920360059146287216807400",
+        Easy: "090000004600204305000509710060308100723046080014057200030015802006402053050890400",
+        EasyMedium: "000090060001007000570006000200000004095003001000050800300009040610000007080601009",
+        Medium: "070500000000600158120000006000060019006900042200400000069000030080030020000040001",
+        MediumHard: "000280500500000090470300010032010000910008200060000007600000000003000001000906000",
         Hard: "",
         VeryHard: "",
         Expert: "423870061160023087708060023802730604300206708576080239931642875680307102207018306",
@@ -142,10 +142,20 @@ input[type="text"] {
          */
         _candidates;
 
-        constructor(data) {
-            if (data instanceof String) {
-                this.data = data;
+        /**
+         * History of game states
+         * @type {Sudoku[]}
+         */
+        _history = [];
+
+        constructor(flattenedData) {
+            if (typeof flattenedData === "string" || flattenedData instanceof String) {
+                this.flattenedData = flattenedData;
             }
+        }
+
+        clone() {
+            return new Sudoku(this.flattenedData);
         }
 
         get candidates() {
@@ -157,17 +167,25 @@ input[type="text"] {
         }
 
         /**
-          * @param {String} data - serialized board data
+         * @returns {String} flattened board data
+         */
+        get flattenedData() {
+            return this._data.flat().join("");
+        }
+
+        /**
+          * @param {String} data - flattened board data
           */
-        set data(data) {
+        set flattenedData(data) {
+            // console.debug(`Sudoku.data = "${data}"`);
             let i = 0;
             for (let row = 0; row < 9; ++row) {
                 for (let col = 0; col < 9; ++col) {
-                    let digit = parseInt(data[i++]);
-                    this._data[row][col] = digit;
+                    this._data[row][col] = parseInt(data[i++]);
                 }
             }
-            this._calc_all_candidates();
+            this._calcAllCandidates();
+            this.updateHash();
         }
 
         /**
@@ -226,14 +244,46 @@ input[type="text"] {
             return block;
         }
 
-        getCandidatesColumn(idx) {
-            return this._candidates.map(d => d[idx]);
+        getUnit(unit_type, unit_index) {
+            switch (unit_type) {
+                case "row":
+                    return this.getCandidatesRow(unit_index);
+                case "column":
+                    return this.getCandidatesColumn(unit_index);
+                case "block":
+                    const rowIdx = Math.floor(unit_index / 3);
+                    const colIdx = unit_index % 3;
+                    return this.getCandidatesBlock(rowIdx, colIdx);
+                default:
+                    console.error(`Invalid unit type "${unit_type}`);
+                    break;
+            }
         }
 
-        getCandidatesRow(idx) {
-            return this._candidates[idx];
+        /**
+         * Get the list of all notes in a row.
+         * @param {number} colIdx
+         * @returns {Set[]}
+         */
+        getCandidatesColumn(colIdx) {
+            return this._candidates.map(d => d[colIdx]);
         }
 
+        /**
+         * Get the list of all notes in a column.
+         * @param {number} rowIdx
+         * @returns {Set[]}
+         */
+        getCandidatesRow(rowIdx) {
+            return this._candidates[rowIdx];
+        }
+
+        /**
+         * Get the list of all notes in a block.
+         * @param {number} rowIdx - 0..2
+         * @param {number} colIdx - 0..2
+         * @returns {Set[]}
+         */
         getCandidatesBlock(rowIdx, colIdx) {
             let block = [];
             const rowStart = rowIdx * 3;
@@ -247,116 +297,303 @@ input[type="text"] {
             return block;
         }
 
-        _calc_all_candidates() {
+        _calcAllCandidates() {
             this._candidates = [...Array(9)].map(() => Array(9));
-            let col_forbidden = Array(9);
-            let block_forbidden = [...Array(3)].map(() => Array(3));
+            let colForbidden = Array(9);
+            let blockForbidden = [...Array(3)].map(() => Array(3));
             for (let row = 0; row < 9; ++row) {
-                let row_forbidden = new Set(this.getRow(row)).difference(EMPTY);
+                let rowForbidden = new Set(this.getRow(row)).difference(EMPTY);
                 for (let col = 0; col < 9; ++col) {
-                    if (!col_forbidden[col]) {
-
-                        col_forbidden[col] = new Set(this.getColumn(col)).difference(EMPTY);
+                    if (!colForbidden[col]) {
+                        colForbidden[col] = new Set(this.getColumn(col)).difference(EMPTY);
                     }
-                    const block_row_idx = Math.floor(row / 3);
-                    const block_col_idx = Math.floor(col / 3);
-                    if (!block_forbidden[block_row_idx][block_col_idx]) {
-                        block_forbidden[block_row_idx][block_col_idx] = new Set(this.getBlock(block_row_idx, block_col_idx)).difference(EMPTY);
+                    const blockRowIdx = Math.floor(row / 3);
+                    const blockColIdx = Math.floor(col / 3);
+                    if (!blockForbidden[blockRowIdx][blockColIdx]) {
+                        blockForbidden[blockRowIdx][blockColIdx] = new Set(this.getBlock(blockRowIdx, blockColIdx)).difference(EMPTY);
                     }
                     if (this._data[row][col] !== 0) {
                         this._candidates[row][col] = new Set();
                     }
                     else {
                         this._candidates[row][col] = ALL_DIGITS
-                            .difference(block_forbidden[block_row_idx][block_col_idx])
-                            .difference(row_forbidden)
-                            .difference(col_forbidden[col]);
+                            .difference(blockForbidden[blockRowIdx][blockColIdx])
+                            .difference(rowForbidden)
+                            .difference(colForbidden[col]);
                     }
                 }
             }
         }
 
-        find_first_naked_pair_in_unit(unit_type) {
-            console.debug(`find_first_naked_pair_in_unit("${unit_type}")`);
-            for (let unit_index = 0; unit_index < 9; ++unit_index) {
-                let unit;
-                switch (unit_type) {
-                    case "row":
-                        unit = this.getCandidatesRow(unit_index);
-                        break;
-                    case "column":
-                        unit = this.getCandidatesColumn(unit_index);
-                        break;
-                    case "block":
-                        const rowIdx = Math.floor(unit_index / 3);
-                        const colIdx = unit_index % 3;
-                        unit = this.getCandidatesBlock(rowIdx, colIdx);
-                        break;
-                }
-                for (let i = 0; i < 9; ++i) {
-                    for (let j = i + 1; j < 9; ++j) {
-                        const cell1_candidates = unit[i];
-                        const cell2_candidates = unit[j];
-                        if (cell1_candidates.size == 0 && cell2_candidates.size == 0)
+        resolveSingle(row, col, number) {
+            this._history.push(this.clone());
+            // console.debug(`resolveSingle(${row}, ${col}) -> `, this._candidates[row][col].values().next().value)
+            this._data[row][col] = number;
+        }
+
+        /**
+         * 
+         * @param {{row: number; col: number}[]} cells 
+         * @param {Set<number>} pair 
+         * @param {string} unit_type 
+         * @return {number} number of cells removed
+         */
+        resolveNakedPair(cells, pair, unit_type) {
+            console.debug("resolveNakedPair()", cells, pair, unit_type);
+            let removedCount = 0;
+            switch (unit_type) {
+                case "row":
+                    const row = cells[0].row;
+                    const rowCandidates = this.getCandidatesRow(row);
+                    for (let col = 0; col < rowCandidates.length; ++col) {
+                        if (cells[0].row === row && cells[0].col === col)
                             continue
-                        const pair = cell1_candidates.intersection(cell2_candidates);
-                        if (pair.size !== 2 || cell1_candidates.size !== 2 || cell2_candidates.size !== 2)
-                            continue;
-                        let row1, col1, row2, col2;
-                        switch (unit_type) {
-                            case "row":
-                                [row1, col1] = [unit_index, i];
-                                [row2, col2] = [unit_index, j];
-                                break;
-                            case "column":
-                                [row1, col1] = [i, unit_index];
-                                [row2, col2] = [j, unit_index];
-                                break;
-                            case "block":
-                                const rowStart = Math.floor(unit_index / 3) * 3;
-                                const colStart = (unit_index % 3) * 3;
-                                row1 = rowStart + Math.floor(i / 3);
-                                col1 = colStart + i % 3;
-                                row2 = rowStart + Math.floor(j / 3);
-                                col2 = colStart + j % 3;
-                                break;
+                        if (cells[1].row === row && cells[1].col === col)
+                            continue
+                        removedCount += rowCandidates[col].size - rowCandidates[col].difference(pair).size;
+                        rowCandidates[col] = rowCandidates[col].difference(pair);
+                    }
+                    break;
+                case "column":
+                    const col = cells[0].col;
+                    const colCandidates = this.getCandidatesColumn(col);
+                    for (let row = 0; row < colCandidates.length; ++row) {
+                        if (cells[0].row === row && cells[0].col === col)
+                            continue
+                        if (cells[1].row === row && cells[1].col === col)
+                            continue
+                        removedCount += colCandidates[row].size - colCandidates[row].difference(pair).size;
+                        colCandidates[row] = colCandidates[row].difference(pair);
+                    }
+                    break;
+                case "block":
+                    const rowStart = Math.floor(cells[0].row / 3);
+                    const colStart = Math.floor(cells[0].row / 3);
+                    const blockCandidates = this.getCandidatesBlock(rowStart, colStart);
+                    for (let rowOffset = 0; rowOffset < 3; ++rowOffset) {
+                        for (let colOffset = 0; colOffset < 3; ++colOffset) {
+                            const row = rowStart + rowOffset;
+                            const col = colStart + colOffset;
+                            if (cells[0].row === row && cells[0].col === col)
+                                continue
+                            if (cells[1].row === row && cells[1].col === col)
+                                continue
+                            const blockIdx = rowOffset * 3 + colOffset;
+                            removedCount += blockCandidates[blockIdx].size - blockCandidates[blockIdx].difference(pair).size;
+                            blockCandidates[blockIdx] = blockCandidates[blockIdx].difference(pair);
                         }
-                        return {
-                            cells: [
-                                { row: row1, col: col1 },
-                                { row: row2, col: col2 }
-                            ],
-                            pair
-                        };
+                    }
+                    break;
+            }
+            return removedCount;
+        }
+
+        isSolved() {
+            return this._data.every(row => row.every(cell => cell !== 0));
+        }
+
+        nextStep() {
+            if (this.isSolved())
+                return false;
+            let resolutions = { obviousSingle: 0, hiddenSingle: 0, nakedPair: 0, hiddenPair: 0 };
+            let progressMade = false;
+            const result = this.findFirstObviousSingle();
+            if (result) {
+                const { row, col, number } = result;
+                console.info(`obvious single ${number} found at ${row},${col}`);
+                const currentGame = this.clone();
+                this._history.push(currentGame);
+                this.resolveSingle(row, col, number);
+                this.updateHash();
+                this._calcAllCandidates();
+                progressMade = true;
+                resolutions.obviousSingle += 1;
+            }
+            if (!progressMade) {
+                const result = this.findFirstHiddenSingle();
+                if (result) {
+                    const { row, col, number } = result;
+                    console.info(`hidden single ${number} found at ${row},${col}`);
+                    this._history.push(this.clone());
+                    this.resolveSingle(row, col, number);
+                    this.updateHash();
+                    this._calcAllCandidates();
+                    progressMade = true;
+                    resolutions.hiddenSingle += 1;
+                }
+
+            }
+            if (!progressMade) {
+                let result;
+                do {
+                    result = this.findFirstNakedPair();
+                    if (result) {
+                        const { cells, pair, unit_type } = result;
+                        this._history.push(this.clone());
+                        const removedCount = this.resolveNakedPair(cells, pair, unit_type);
+                        // TODO: if `removedCount` is 0, no candidates have been removed,
+                        // i.e. in the next iteration the same result will be found again.
+                        // Thus, you must not search for the *first* naked pair, but for
+                        // the next. 
+                        this.updateHash();
+                        this._calcAllCandidates();
+                        progressMade = removedCount > 0;
+                        resolutions.nakedPair += removedCount;
+                    }
+                } while (result && !progressMade)
+            }
+            if (this.isSolved())
+                return false;
+        }
+
+        prevStep() {
+            const prevGame = this._history.pop();
+            if (!prevGame)
+                return false;
+            this.flattenedData = prevGame.flattenedData;
+            console.debug(`Restoring previous game to `, this.flattenedData);
+            return true;
+        }
+
+        solve() {
+            while (!this.isSolved()) {
+                this.nextStep();
+            }
+        }
+
+        updateHash() {
+            document.location.hash = this.flattenedData;
+        }
+
+        /**
+         * @param {string} unit_type - "row", "column", or "block"
+         * @returns {{row: number; col: number; number: number}};
+         */
+        findFirstObviousSingle() {
+            for (let row = 0; row < 9; ++row) {
+                for (let col = 0; col < 9; ++col) {
+                    if (this._candidates[row][col].size === 1) {
+                        const number = this._candidates[row][col].values().next().value;
+                        return { row, col, number };
                     }
                 }
             }
         }
 
-        find_first_naked_pair() {
+        _findFirstHiddenSingleInUnit(unit_type) {
+            for (let unit_index = 0; unit_index < 9; ++unit_index) {
+                let digitHisto = new Array(9).fill(0);
+                const unit = this.getUnit(unit_type, unit_index);
+                for (let i = 0; i < 9; ++i) {
+                    const candidates = unit[i];
+                    for (const num of candidates) {
+                        digitHisto[num - 1] += 1;
+                    }
+                }
+                console.debug(`${unit_type} ${unit_index} histo = ${digitHisto.map((count, idx) => `${idx + 1}: ${count}`).join(", ")}`)
+                digitHisto = digitHisto.map((count, number) => {
+                    ++number;
+                    return { number, count }
+                }).filter(value => value.count === 1).map(value => value.number);
+                if (digitHisto.length === 0)
+                    continue;
+                const number = digitHisto.shift();
+                for (let i = 0; i < 9; ++i) {
+                    if (!unit[i].has(number))
+                        continue;
+                    let row, col;
+                    switch (unit_type) {
+                        case "row":
+                            [row, col] = [unit_index, i];
+                            break;
+                        case "column":
+                            [row, col] = [i, unit_index];
+                            break;
+                        case "block":
+                            const rowStart = Math.floor(unit_index / 3) * 3;
+                            const colStart = (unit_index % 3) * 3;
+                            row = rowStart + Math.floor(i / 3);
+                            col = colStart + i % 3;
+                            break;
+                        default:
+                            console.error(`Invalid unit type "${unit_type}"`);
+                            break;
+                    }
+                    return { number, row, col };
+                }
+            }
+        }
+
+        findFirstHiddenSingle() {
             for (const unit_type of UNITS) {
-                const result = this.find_first_naked_pair_in_unit(unit_type);
+                const result = this._findFirstHiddenSingleInUnit(unit_type);
                 if (result)
                     return result
             }
         }
 
-        find_first_hidden_pair_in_unit(unit_type) {
-            for (let unit_index = 0; unit_index < 9; ++unit_index) {
-                let unit;
-                switch (unit_type) {
-                    case "row":
-                        unit = this.getCandidatesRow(unit_index);
-                        break;
-                    case "column":
-                        unit = this.getCandidatesColumn(unit_index);
-                        break;
-                    case "block":
-                        const rowIdx = Math.floor(unit_index / 3);
-                        const colIdx = unit_index % 3;
-                        unit = this.getCandidatesBlock(rowIdx, colIdx);
-                        break;
+        _findNakedPairInUnit(unit_type, unit_index) {
+            const unit = this.getUnit(unit_type, unit_index);
+            for (let i = 0; i < 9; ++i) {
+                for (let j = i + 1; j < 9; ++j) {
+                    const cell1_candidates = unit[i];
+                    const cell2_candidates = unit[j];
+                    if (cell1_candidates.size == 0 && cell2_candidates.size == 0)
+                        continue
+                    const pair = cell1_candidates.intersection(cell2_candidates);
+                    if (pair.size !== 2 || cell1_candidates.size !== 2 || cell2_candidates.size !== 2)
+                        continue;
+                    let row1, col1, row2, col2;
+                    switch (unit_type) {
+                        case "row":
+                            [row1, col1] = [unit_index, i];
+                            [row2, col2] = [unit_index, j];
+                            break;
+                        case "column":
+                            [row1, col1] = [i, unit_index];
+                            [row2, col2] = [j, unit_index];
+                            break;
+                        case "block":
+                            const rowStart = Math.floor(unit_index / 3) * 3;
+                            const colStart = (unit_index % 3) * 3;
+                            row1 = rowStart + Math.floor(i / 3);
+                            col1 = colStart + i % 3;
+                            row2 = rowStart + Math.floor(j / 3);
+                            col2 = colStart + j % 3;
+                            break;
+                    }
+                    return {
+                        cells: [
+                            { row: row1, col: col1 },
+                            { row: row2, col: col2 }
+                        ],
+                        pair,
+                        unit_type,
+                    };
                 }
+            }
+        }
+
+        /**
+         * 
+         * @returns {{cells: {row: number; col: number; }[]; pair: Set<number>}};
+         }}
+         */
+        findFirstNakedPair() {
+            for (const unit_type of UNITS) {
+                const result = this._findNakedPairInUnit(unit_type);
+                if (result)
+                    return result
+            }
+        }
+
+        /**
+         * @param {string} unit_type - "row", "column", or "block"
+         * @returns {{cells: {row: number; col: number; }[]; pair: Set<number>}};
+         */
+        _findFirstHiddenPairInUnit(unit_type) {
+            for (let unit_index = 0; unit_index < 9; ++unit_index) {
+                const unit = this.getUnit(unit_type, unit_index);
                 let candidate_counts = {};
                 for (const cell_candidates of unit) {
                     if (cell_candidates.size == 0)
@@ -365,9 +602,10 @@ input[type="text"] {
                         candidate_counts[candidate] = candidate_counts[candidate] ? candidate_counts[candidate] + 1 : 1;
                     }
                 }
+                console.debug("candidate_counts = ", candidate_counts);
                 const potential_pairs = Object.entries(candidate_counts)
                     .filter(value => {
-                        const [candidate, count] = value;
+                        const [_candidate, count] = value;
                         return count === 2;
                     }).map(value => parseInt(value[0]));
                 if (potential_pairs.length < 2)
@@ -425,9 +663,13 @@ input[type="text"] {
             }
         }
 
-        find_first_hidden_pair() {
+        /**
+         * @returns {{cells: {row: number; col: number; }[]; pair: Set<number>}};
+         }}
+         */
+        findFirstHiddenPair() {
             for (const unit_type of UNITS) {
-                const result = this.find_first_hidden_pair_in_unit(unit_type);
+                const result = this._findFirstHiddenPairInUnit(unit_type);
                 if (result)
                     return result
             }
@@ -458,11 +700,8 @@ input[type="text"] {
     padding: 0;
     box-sizing: border-box;
 }
-html, body {
-    background-color: #efebdd;
-    color: #222;
-}
 .board-container {
+    width: fit-content;
     position: relative;
     display: grid;
     grid-template-columns: repeat(9, calc(4px + 3 * var(--cell-size)));
@@ -488,7 +727,7 @@ html, body {
          * @param {String} data - serialized board data
          */
         set data(data) {
-            this._sudoku.data = data;
+            this._sudoku.flattenedData = data;
             for (let row = 0; row < 9; ++row) {
                 for (let col = 0; col < 9; ++col) {
                     const cell = this._board[row][col];
@@ -496,11 +735,30 @@ html, body {
                     cell.candidates = this._sudoku.candidates[row][col];
                 }
             }
-            let result;
-            result = this._sudoku.find_first_naked_pair();
-            console.debug("naked pair", result);
-            result = this._sudoku.find_first_hidden_pair();
-            console.debug("hidden pair", result);
+        }
+
+        solve() {
+            this._sudoku.solve();
+        }
+
+        updateBoard() {
+            for (let row = 0; row < 9; ++row) {
+                for (let col = 0; col < 9; ++col) {
+                    const cell = this._board[row][col];
+                    cell.digit = this._sudoku.data[row][col];
+                    cell.candidates = this._sudoku.candidates[row][col];
+                }
+            }
+        }
+
+        nextStep() {
+            this._sudoku.nextStep();
+            this.updateBoard();
+        }
+
+        prevStep() {
+            this._sudoku.prevStep();
+            this.updateBoard();
         }
 
     }
@@ -512,6 +770,19 @@ html, body {
         customElements.define("sudoku-game", SudokuElement);
         el.game = document.querySelector("sudoku-game");
         el.game.data = DEMO_GAMES.Expert;
+
+        document.querySelector("#step-back").addEventListener("click", e => {
+            el.game.prevStep();
+            e.stopImmediatePropagation();
+            e.preventDefault();
+        });
+        document.querySelector("#step-forward").addEventListener("click", e => {
+            el.game.nextStep();
+            e.stopImmediatePropagation();
+            e.preventDefault();
+        });
+
+        // el.game.solve();
     }
 
     window.addEventListener("pageshow", main);
