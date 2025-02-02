@@ -776,7 +776,7 @@ sudoku-cell {
         customElements.define("sudoku-cell", Cell);
         customElements.define("sudoku-game", SudokuElement);
         el.game = document.querySelector("sudoku-game");
-        el.game.data = DEMO_GAMES.Expert;
+        el.game.data = DEMO_GAMES.Medium;
 
         document.querySelector("#step-back").addEventListener("click", e => {
             el.game.prevStep();
