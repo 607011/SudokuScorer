@@ -26,5 +26,16 @@ main {
 }
 
 sudoku-game {
+    display: block;
     margin: 0 auto;
+    width: fit-content;
+}
+
+button {
+    width: 44px;
+    height: 44px;
+    font-size: 44px;
+    appearance: none;
+    border: none;
+    cursor: pointer;
 }
