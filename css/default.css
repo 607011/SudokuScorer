@@ -1,3 +1,7 @@
+:root {
+    --bg-color: #efebdd;
+    --fg-color: #222;
+}
 * {
     margin: 0;
     padding: 0;
@@ -7,11 +11,11 @@
 body {
     margin: 0;
     font-family: Helvetica, Arial, sans-serif;
-    background-color: #efebdd;
+    background-color: var(--bg-color);
     display: flex;
     flex-direction: column;
     height: 100vh;
-    color: #222;
+    color: var(--fg-color);
 }
 
 header,

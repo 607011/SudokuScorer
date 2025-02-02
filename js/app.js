@@ -49,12 +49,12 @@
     display: grid;
     grid-template-columns: repeat(3, var(--cell-size));
     grid-template-rows: repeat(3, var(--cell-size));
-    border: 1px solid #ccc;
 }
 .notes-container > div {
     padding: 2px;
     color: #999;
     visibility: hidden;
+    text-align: center;
 }
 .notes-container > div.show {
     visibility: visible;
@@ -702,12 +702,33 @@ input[type="text"] {
 }
 .board-container {
     width: fit-content;
-    position: relative;
     display: grid;
-    grid-template-columns: repeat(9, calc(4px + 3 * var(--cell-size)));
-    gap: 0;
+    grid-template-columns: repeat(9, calc(3 * var(--cell-size)));
+    gap: 1px;
+    background-color: #555;
+    border: 2px solid #555;
 }
-`
+sudoku-cell {
+    background-color: var(--bg-color);
+}
+`;
+            for (let row = 0; row < 12; row += 3) {
+                for (let col = 0; col < 9; ++col) {
+                    styles.textContent += `
+                    .board-container > sudoku-cell:nth-child(${1 + row * 9 + col}) { border-top: 1px solid #555 }
+                    .board-container > sudoku-cell:nth-child(${1 + (row - 1) * 9 + col}) { border-bottom: 1px solid #555 }
+                    `;
+                }
+            }
+            for (let col = 0; col < 12; col += 3) {
+                for (let row = 0; row < 9; ++row) {
+                    styles.textContent += `
+                    .board-container > sudoku-cell:nth-child(${1 + row * 9 + col}) { border-left: 1px solid #555 }
+                    .board-container > sudoku-cell:nth-child(${row * 9 + col}) { border-right: 1px solid #555 }
+                    `;
+                }
+            }
+
             this._boardContainer = document.createElement("div");
             this._boardContainer.className = "board-container";
             this._board = [];
