@@ -249,7 +249,7 @@ input[type="text"] {
         /**
          * Get the list of all notes in a row.
          * @param {number} colIdx
-         * @returns {Set[]}
+         * @returns {Set<number>[]}
          */
         getCandidatesColumn(colIdx) {
             return this._candidates.map(d => d[colIdx]);
@@ -258,7 +258,7 @@ input[type="text"] {
         /**
          * Get the list of all notes in a column.
          * @param {number} rowIdx
-         * @returns {Set[]}
+         * @returns {Set<number>[]}
          */
         getCandidatesRow(rowIdx) {
             return this._candidates[rowIdx];
@@ -268,7 +268,7 @@ input[type="text"] {
          * Get the list of all notes in a block.
          * @param {number} rowIdx - 0..2
          * @param {number} colIdx - 0..2
-         * @returns {Set[]}
+         * @returns {Set<number>[]}
          */
         getCandidatesBlock(rowIdx, colIdx) {
             let block = [];
@@ -562,10 +562,10 @@ input[type="text"] {
 
         /**
          * 
-         * @returns {{cells: {row: number; col: number; }[]; pair: Set<number>}};
+         * @returns {{cells: {row: number; col: number; }[]; pair: Set<number>}[]};
          }}
          */
-        findFirstNakedPair() {
+        findAllNakedPairs() {
             for (const unit_type of UNITS) {
                 const result = this._findNakedPairInUnit(unit_type);
                 if (result)
@@ -596,7 +596,7 @@ input[type="text"] {
                     }).map(value => parseInt(value[0]));
                 if (potential_pairs.length < 2)
                     continue;
-
+                // the nested loop is a decent way to iterate over all combinations of digit pairs
                 for (let i = 0; i < 9; ++i) {
                     for (let j = i + 1; j < 9; ++j) {
                         const pair = new Set([potential_pairs[i], potential_pairs[j]])
