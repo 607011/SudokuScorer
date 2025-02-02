@@ -789,7 +789,9 @@ sudoku-cell {
             e.preventDefault();
         });
 
-        // el.game.solve();
+        window.addEventListener("hashchange", () => {
+            el.game.data = document.location.hash.substring(1);
+        });
     }
 
     window.addEventListener("pageshow", main);

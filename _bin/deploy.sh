@@ -4,6 +4,7 @@ source .env
 
 DIST=dist
 
+mkdir -p ${DIST}
 cp -r index.html js css ${DIST}
 echo Minifying ...
 minify ${DIST}/index.html -o ${DIST}/index.html
