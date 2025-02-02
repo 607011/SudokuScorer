@@ -224,26 +224,12 @@ input[type="text"] {
             return block;
         }
 
-        getColumn(idx) {
-            return this._data.map(d => d[idx]);
-        }
-
-        getRow(idx) {
-            return this._data[idx];
-        }
-
-        getBlock(rowIdx, colIdx) {
-            let block = [];
-            const rowStart = rowIdx * 3;
-            const colStart = colIdx * 3;
-            for (let y = 0; y < 3; ++y) {
-                for (let x = 0; x < 3; ++x) {
-                    block.push(this._data[rowStart + y][colStart + x]);
-                }
-            }
-            return block;
-        }
-
+        /**
+         * 
+         * @param {string} unit_type - "row", "column", or "block"
+         * @param {number} unit_index (0..8)
+         * @returns Set<number>[]
+         */
         getUnit(unit_type, unit_index) {
             switch (unit_type) {
                 case "row":
